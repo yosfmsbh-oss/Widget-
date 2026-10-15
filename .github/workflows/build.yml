@@ -1,4 +1,4 @@
-name: Build APK
+name: Build WidgetDesigner APK
 on:
   push:
     branches: [main]
@@ -39,6 +39,7 @@ jobs:
               <uses-permission android:name="android.permission.INTERNET" />
               <application
                   android:label="مصمم الودجت"
+                  android:icon="@drawable/ic_launcher"
                   android:supportsRtl="true"
                   android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
@@ -141,9 +142,10 @@ jobs:
           .seg button{flex:1;font:inherit;padding:9px 4px;border:0;background:var(--bg);color:var(--ink);cursor:pointer}
           .seg button.on{background:var(--acc);color:var(--accink)}
           .go{width:100%;margin-top:14px;font:inherit;font-size:17px;font-family:Cairo,sans-serif;padding:14px;border:0;border-radius:12px;background:var(--acc);color:var(--accink);cursor:pointer}
-          #out{display:none;text-align:center}
-          #out img{max-width:100%;border-radius:12px;-webkit-touch-callout:default;user-select:auto}
-          #out p{font-size:14px;color:var(--mut);line-height:1.7}
+          #msg{text-align:center;font-size:14px;color:var(--mut);line-height:1.7;margin:10px 0 24px}
+          .hint{font-size:13px;color:var(--mut);text-align:center;margin:10px 0 0;line-height:1.7}
+          .sm{margin:0;padding:10px;font-size:15px;background:var(--bg);color:var(--ink);border:1px solid var(--line);font-family:inherit}
+          canvas{touch-action:none;cursor:grab}
           #flist{max-height:280px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
           #flist button{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--ink);padding:10px 12px;cursor:pointer;font-size:24px;line-height:1.5}
           #flist button.on{background:var(--acc);color:var(--accink)}
@@ -153,13 +155,14 @@ jobs:
           .tab{flex:none;font:inherit;padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
           .tab.on{background:var(--acc);color:var(--accink);border-color:var(--acc)}
           .tab.add{border-style:dashed}
-          #out img{display:block;margin:0 auto 12px}
           </style>
           </head>
           <body>
           <h1>مصمم ودجت الشاشة الرئيسية</h1>
           <div id="tabs"></div>
           <div class="stage"><canvas id="cv"></canvas></div>
+          <p class="hint">اسحب النص أو الصورة بإصبعك لتحريكها، وبإصبعين لتكبير الصورة</p>
+          <div class="row" style="margin-top:10px"><button class="go sm" type="button" id="rt">إعادة مكان النص</button><button class="go sm" type="button" id="ri">إعادة مكان الصورة</button></div>
 
           <div class="card">
           <label>النص</label>
@@ -240,23 +243,20 @@ jobs:
           <input type="range" id="sw" min="1" max="30" value="4">
           </div>
 
-          <button class="go" id="save">حفظ كصورة</button>
-          <div class="card" id="out">
-          <div id="imgs"></div>
-          <p>اضغط مطولًا على الصورة واختر «حفظ الصورة». بعدها أضف ودجت صورة (مثل Photo Widget) على الشاشة الرئيسية واختر هذه الصورة.</p>
-          </div>
+          <button class="go" id="save">إضافة الودجت إلى الشاشة الرئيسية</button>
+          <p id="msg"></p>
 
           <script>
           const $=id=>document.getElementById(id);
           const cv=$('cv'),ctx=cv.getContext('2d');
           const presets=[['#0f766e','#134e4a'],['#7c3aed','#312e81'],['#e11d48','#7f1d1d'],['#f59e0b','#b45309'],['#0ea5e9','#1e3a8a'],['#111111','#3f3f46'],['#ec4899','#be185d']];
-          let ratio=2,shadow=1,align='center',pick=0;
+          let ratio=2,shadow=1,align='center',pick=0;let tx=0,ty=0,ix=0,iy=0,iz=1,tbox=null;
           presets.forEach((p,i)=>{const b=document.createElement('button');b.className='chip'+(i==0?' on':'');b.style.background=`linear-gradient(135deg,${p[0]},${p[1]})`;b.onclick=()=>{$('c1').value=p[0];$('c2').value=p[1];[...$('chips').children].forEach(c=>c.classList.remove('on'));b.classList.add('on');draw()};$('chips').appendChild(b)});
           function seg(id,fn){$(id).onclick=e=>{const b=e.target.closest('button');if(!b)return;[...$(id).children].forEach(x=>x.classList.remove('on'));b.classList.add('on');fn(b.dataset.v);draw()}}
           seg('al',v=>align=v);seg('shape',v=>ratio=+v);seg('sh',v=>shadow=+v);let stroke=0;seg('st',v=>stroke=+v);let bgimg=null;
           $('pick').onclick=()=>$('file').click();
-          $('file').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{bgimg=im;draw()};im.src=r.result};r.readAsDataURL(f)};
-          $('rm').onclick=()=>{bgimg=null;$('file').value='';draw()};
+          $('file').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{bgimg=im;ix=0;iy=0;iz=1;draw()};im.src=r.result};r.readAsDataURL(f)};
+          $('rm').onclick=()=>{bgimg=null;ix=0;iy=0;iz=1;$('file').value='';draw()};
           ['txt','font','size','tc','c1','c2','op','rad','sc','sw','dim'].forEach(i=>$(i).addEventListener('input',draw));
           function rr(x,y,w,h,r){r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
           function draw(){
@@ -265,26 +265,42 @@ jobs:
            ctx.clearRect(0,0,W,H);
            ctx.globalAlpha=$('op').value/100;
            const g=ctx.createLinearGradient(0,0,W,H);g.addColorStop(0,$('c1').value);g.addColorStop(1,$('c2').value);
-           if(window.widgets&&!window.loading)widgets[cur]=getState();
            $('dv').textContent=$('dim').value;
            rr(0,0,W,H,+$('rad').value);
-           if(bgimg){ctx.save();ctx.clip();const s=Math.max(W/bgimg.width,H/bgimg.height),iw=bgimg.width*s,ih=bgimg.height*s;ctx.drawImage(bgimg,(W-iw)/2,(H-ih)/2,iw,ih);ctx.fillStyle='rgba(0,0,0,'+$('dim').value/100+')';ctx.fillRect(0,0,W,H);ctx.restore()}else{ctx.fillStyle=g;ctx.fill()}
+           if(bgimg){ctx.save();ctx.clip();const s=Math.max(W/bgimg.width,H/bgimg.height)*iz,iw=bgimg.width*s,ih=bgimg.height*s,mx=(iw-W)/2/W,my=(ih-H)/2/H;ix=Math.max(-mx,Math.min(mx,ix));iy=Math.max(-my,Math.min(my,iy));ctx.drawImage(bgimg,(W-iw)/2+ix*W,(H-ih)/2+iy*H,iw,ih);ctx.fillStyle='rgba(0,0,0,'+$('dim').value/100+')';ctx.fillRect(0,0,W,H);ctx.restore()}else{ctx.fillStyle=g;ctx.fill()}
            ctx.globalAlpha=1;
            const fs=+$('size').value*(W/560*0.9),pad=W*0.08;
            ctx.font=`${fs}px "${$('font').value}", sans-serif`;
            ctx.direction='rtl';ctx.textBaseline='middle';ctx.fillStyle=$('tc').value;
            ctx.textAlign=align;
-           const x=align==='center'?W/2:align==='right'?W-pad:pad;
+           const x=(align==='center'?W/2:align==='right'?W-pad:pad)+tx*W;
            if(shadow){ctx.shadowColor='rgba(0,0,0,.45)';ctx.shadowBlur=shadow*10;ctx.shadowOffsetY=shadow*3}else{ctx.shadowColor='transparent'}
            const maxW=W-pad*2,lines=[];
            $('txt').value.split('\n').forEach(par=>{let cur='';par.split(' ').forEach(w=>{const t=cur?cur+' '+w:w;if(ctx.measureText(t).width>maxW&&cur){lines.push(cur);cur=w}else cur=t});lines.push(cur)});
-           const lh=fs*1.45,top=H/2-(lines.length-1)*lh/2;
+           const lh=fs*1.45,top=H/2-(lines.length-1)*lh/2+ty*H;let mw=0;lines.forEach(l=>{mw=Math.max(mw,ctx.measureText(l).width)});tbox={x:(align==='center'?x-mw/2:align==='right'?x-mw:x)-24,y:top-lh/2-12,w:mw+48,h:lines.length*lh+24};
            $('swv').textContent=$('sw').value;
            if(stroke){ctx.lineJoin='round';ctx.strokeStyle=$('sc').value;ctx.lineWidth=+$('sw').value*(W/560)*2;lines.forEach((l,i)=>ctx.strokeText(l,x,top+i*lh))}
            lines.forEach((l,i)=>ctx.fillText(l,x,top+i*lh));
            ctx.shadowColor='transparent';
+           if(window.widgets&&!window.loading)widgets[cur]=getState();
           }
-          $('save').onclick=()=>{const box=$('imgs');box.innerHTML='';const keep=cur,urls=[];widgets.forEach((w,i)=>{setState(w);const im=new Image();im.src=cv.toDataURL('image/png');im.alt='ودجت '+(i+1);box.appendChild(im);urls.push(im.src)});setState(widgets[keep]);if(window.Android&&Android.saveDesigns){Android.saveDesigns(JSON.stringify(urls))}$('out').style.display='block';$('out').scrollIntoView({behavior:'smooth'})};
+          const ptrs=new Map();let drag=null,pinch=null;
+          function pos(e){const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*cv.width/r.width,y:(e.clientY-r.top)*cv.height/r.height}}
+          cv.addEventListener('pointerdown',e=>{
+           e.preventDefault();cv.setPointerCapture(e.pointerId);const p=pos(e);ptrs.set(e.pointerId,p);
+           if(ptrs.size===1){const t=tbox&&p.x>=tbox.x&&p.x<=tbox.x+tbox.w&&p.y>=tbox.y&&p.y<=tbox.y+tbox.h;drag=t?'text':(bgimg?'img':null);pinch=null}
+           else if(ptrs.size===2&&bgimg){drag=null;const v=[...ptrs.values()];pinch={d:Math.hypot(v[0].x-v[1].x,v[0].y-v[1].y)||1,z:iz}}
+          });
+          cv.addEventListener('pointermove',e=>{
+           if(!ptrs.has(e.pointerId))return;const p=pos(e),o=ptrs.get(e.pointerId);ptrs.set(e.pointerId,p);
+           if(pinch&&ptrs.size>=2){const v=[...ptrs.values()];iz=Math.max(1,Math.min(4,pinch.z*Math.hypot(v[0].x-v[1].x,v[0].y-v[1].y)/pinch.d));draw()}
+           else if(drag==='text'){tx=Math.max(-.5,Math.min(.5,tx+(p.x-o.x)/cv.width));ty=Math.max(-.5,Math.min(.5,ty+(p.y-o.y)/cv.height));draw()}
+           else if(drag==='img'){ix+=(p.x-o.x)/cv.width;iy+=(p.y-o.y)/cv.height;draw()}
+          });
+          ['pointerup','pointercancel'].forEach(n=>cv.addEventListener(n,e=>{ptrs.delete(e.pointerId);drag=null;if(ptrs.size<2)pinch=null}));
+          $('rt').onclick=()=>{tx=0;ty=0;draw()};
+          $('ri').onclick=()=>{ix=0;iy=0;iz=1;draw()};
+          $('save').onclick=()=>{const keep=cur,urls=[];widgets.forEach(w=>{setState(w);urls.push(cv.toDataURL('image/png'))});setState(widgets[keep]);const m=$('msg');if(window.Android&&Android.addWidget){m.textContent='';Android.addWidget(JSON.stringify(urls))}else{m.textContent='هذا الزر يعمل داخل التطبيق بعد تثبيته على الجوال'}};
           const fams=[...$('font').options].map(o=>o.value);
           const fl=$('flist');
           [...$('font').options].forEach(o=>{const b=document.createElement('button');b.type='button';b.dataset.f=o.value;b.style.fontFamily='"'+o.value+'",sans-serif';b.innerHTML='<span class="pv"></span><small>'+o.textContent+'</small>';b.onclick=()=>{$('font').value=o.value;mark();draw()};fl.appendChild(b)});
@@ -292,9 +308,9 @@ jobs:
           function pv(){const t=($('txt').value.split('\n')[0]||'أبجد هوز').slice(0,30);fl.querySelectorAll('.pv').forEach(s=>s.textContent=t)}
           $('txt').addEventListener('input',pv);pv();mark();
           var widgets=[],cur=0,loading=false;
-          function getState(){return{txt:$('txt').value,font:$('font').value,size:$('size').value,tc:$('tc').value,c1:$('c1').value,c2:$('c2').value,op:$('op').value,rad:$('rad').value,sc:$('sc').value,sw:$('sw').value,dim:$('dim').value,ratio,shadow,align,stroke,bgimg}}
+          function getState(){return{txt:$('txt').value,font:$('font').value,size:$('size').value,tc:$('tc').value,c1:$('c1').value,c2:$('c2').value,op:$('op').value,rad:$('rad').value,sc:$('sc').value,sw:$('sw').value,dim:$('dim').value,ratio,shadow,align,stroke,bgimg,tx,ty,ix,iy,iz}}
           function setSeg(id,v){[...$(id).children].forEach(b=>b.classList.toggle('on',b.dataset.v==v))}
-          function setState(s){loading=true;['txt','font','size','tc','c1','c2','op','rad','sc','sw','dim'].forEach(k=>$(k).value=s[k]);ratio=s.ratio;shadow=s.shadow;align=s.align;stroke=s.stroke;bgimg=s.bgimg;setSeg('al',align);setSeg('shape',ratio);setSeg('sh',shadow);setSeg('st',stroke);[...$('chips').children].forEach(c=>c.classList.remove('on'));mark();pv();loading=false;draw()}
+          function setState(s){loading=true;['txt','font','size','tc','c1','c2','op','rad','sc','sw','dim'].forEach(k=>$(k).value=s[k]);ratio=s.ratio;shadow=s.shadow;align=s.align;stroke=s.stroke;bgimg=s.bgimg;tx=s.tx;ty=s.ty;ix=s.ix;iy=s.iy;iz=s.iz;setSeg('al',align);setSeg('shape',ratio);setSeg('sh',shadow);setSeg('st',stroke);[...$('chips').children].forEach(c=>c.classList.remove('on'));mark();pv();draw();loading=false}
           function tabs(){const t=$('tabs');t.innerHTML='';const mk=(txt,cls,fn)=>{const b=document.createElement('button');b.type='button';b.className=cls;b.textContent=txt;b.onclick=fn;t.appendChild(b)};
            widgets.forEach((w,i)=>mk('ودجت '+(i+1),'tab'+(i==cur?' on':''),()=>{if(i!=cur){cur=i;setState(widgets[i]);tabs()}}));
            mk('+ إضافة ودجت','tab add',()=>{widgets.push(Object.assign({},getState()));cur=widgets.length-1;tabs()});
@@ -340,6 +356,7 @@ jobs:
                       finish(); return
                   }
 
+                  if (count == 1) { pick(id, 0); return }
                   val root = LinearLayout(this).apply {
                       orientation = LinearLayout.VERTICAL
                       setPadding(32, 32, 32, 32)
@@ -438,11 +455,11 @@ jobs:
           package com.widgetdesigner.app
 
           import android.app.Activity
-          import android.content.ContentValues
+          import android.appwidget.AppWidgetManager
+          import android.content.ComponentName
           import android.content.Intent
           import android.net.Uri
           import android.os.Bundle
-          import android.provider.MediaStore
           import android.util.Base64
           import android.webkit.ValueCallback
           import android.webkit.WebChromeClient
@@ -479,16 +496,6 @@ jobs:
                       }
                   }
 
-                  // ضغط مطوّل على الصورة الناتجة = حفظ في المعرض
-                  web.setOnLongClickListener {
-                      val r = web.hitTestResult
-                      val extra = r.extra
-                      if (r.type == WebView.HitTestResult.IMAGE_TYPE && extra != null && extra.startsWith("data:image")) {
-                          saveImage(extra)
-                          true
-                      } else false
-                  }
-
                   web.addJavascriptInterface(Bridge(), "Android")
                   web.loadUrl("file:///android_asset/index.html")
               }
@@ -506,7 +513,7 @@ jobs:
 
               inner class Bridge {
                   @JavascriptInterface
-                  fun saveDesigns(json: String) {
+                  fun addWidget(json: String) {
                       val arr = JSONArray(json)
                       filesDir.listFiles()?.filter { it.name.startsWith("design_") }?.forEach { it.delete() }
                       for (i in 0 until arr.length()) {
@@ -514,27 +521,20 @@ jobs:
                           File(filesDir, "design_$i.png").writeBytes(bytes)
                       }
                       DesignWidget.updateAll(this@MainActivity)
-                      runOnUiThread {
-                          Toast.makeText(
-                              this@MainActivity,
-                              "تم حفظ ${arr.length()} تصميم. أضف الودجت من الشاشة الرئيسية ثم الأدوات ثم مصمم الودجت",
-                              Toast.LENGTH_LONG
-                          ).show()
-                      }
+                      runOnUiThread { requestPin() }
                   }
               }
 
-              private fun saveImage(dataUrl: String) {
-                  val bytes = Base64.decode(dataUrl.substringAfter(","), Base64.DEFAULT)
-                  val values = ContentValues().apply {
-                      put(MediaStore.Images.Media.DISPLAY_NAME, "widget_${System.currentTimeMillis()}.png")
-                      put(MediaStore.Images.Media.MIME_TYPE, "image/png")
-                      put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/WidgetDesigner")
-                  }
-                  val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-                  if (uri != null) {
-                      contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
-                      Toast.makeText(this, "تم حفظ الصورة في المعرض", Toast.LENGTH_SHORT).show()
+              private fun requestPin() {
+                  val m = AppWidgetManager.getInstance(this)
+                  if (m.isRequestPinAppWidgetSupported) {
+                      m.requestPinAppWidget(ComponentName(this, DesignWidget::class.java), null, null)
+                  } else {
+                      Toast.makeText(
+                          this,
+                          "اضغط مطولًا على الشاشة الرئيسية ثم الأدوات ثم مصمم الودجت",
+                          Toast.LENGTH_LONG
+                      ).show()
                   }
               }
 
@@ -576,6 +576,21 @@ jobs:
               android:initialLayout="@layout/widget"
               android:configure="com.widgetdesigner.app.ConfigActivity"
               android:widgetCategory="home_screen" />
+          EOF_FILE
+          mkdir -p "$(dirname WidgetDesigner/app/src/main/res/drawable/ic_launcher.xml)"
+          cat > WidgetDesigner/app/src/main/res/drawable/ic_launcher.xml <<'EOF_FILE'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp"
+              android:height="108dp"
+              android:viewportWidth="108"
+              android:viewportHeight="108">
+              <path android:fillColor="#6D28D9" android:pathData="M0,0h108v108h-108z" />
+              <path android:fillColor="#FFFFFF" android:pathData="M31,24h14a7,7 0 0 1 7,7v14a7,7 0 0 1 -7,7h-14a7,7 0 0 1 -7,-7v-14a7,7 0 0 1 7,-7z" />
+              <path android:fillColor="#C4B5FD" android:pathData="M63,24h14a7,7 0 0 1 7,7v14a7,7 0 0 1 -7,7h-14a7,7 0 0 1 -7,-7v-14a7,7 0 0 1 7,-7z" />
+              <path android:fillColor="#C4B5FD" android:pathData="M31,56h14a7,7 0 0 1 7,7v14a7,7 0 0 1 -7,7h-14a7,7 0 0 1 -7,-7v-14a7,7 0 0 1 7,-7z" />
+              <path android:fillColor="#FDE68A" android:pathData="M63,56h14a7,7 0 0 1 7,7v14a7,7 0 0 1 -7,7h-14a7,7 0 0 1 -7,-7v-14a7,7 0 0 1 7,-7z" />
+          </vector>
           EOF_FILE
           mkdir -p "$(dirname WidgetDesigner/build.gradle.kts)"
           cat > WidgetDesigner/build.gradle.kts <<'EOF_FILE'
